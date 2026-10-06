@@ -12,7 +12,7 @@
  service cloud.firestore { match /databases/{d}/documents { match /scores/{id} {
    allow read: if true;
    allow create: if request.resource.data.name is string && request.resource.data.name.size() <= 12
-     && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 2000;
+     && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 10000;
    allow update, delete: if false; } } }
  Sin configurar FB, funciona en "MODO LOCAL" (ranking solo en ese celu).
 -->
@@ -39,8 +39,8 @@ const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=270,H=480,G=372;
 // ===== DIFICULTAD (tocá solo estos numeros) =====
 // goal: metros hasta la meta | v0: velocidad inicial | vmax: velocidad maxima
 // ramp: cuanto mas chico, mas rapido acelera | gapMin/gapMax: separacion entre obstaculos (1.0 = casi imposible, 2.5 = facil)
-const DIF={goal:2000,v0:2.8,vmax:7.8,ramp:500,gapMin:1.0,gapMax:2.2};
-const TOUCH=matchMedia('(pointer:coarse)').matches,PRE=TOUCH?'TOCA PARA ':PRE;
+const DIF={goal:3000,v0:2.8,vmax:8.2,ramp:500,gapMin:1.1,gapMax:2.2};
+const TOUCH=matchMedia('(pointer:coarse)').matches,PRE=TOUCH?'TOCA PARA ':'PRESIONE X PARA ';
 const RED='#e8281e',CY='#27d6f0',WH='#fff',GOLD='#c9a227',FONT='"Press Start 2P",monospace';
 let step=0,mode='flyer',T=[0],now=0,last=0,blink=0;
 const R=(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x|0,y|0,w|0,h|0)};
@@ -91,7 +91,7 @@ async function getTop(){if(db){try{const q=await db.collection('scores').orderBy
 function placeNm(){const r=cv.getBoundingClientRect(),sc=Math.min(r.width/W,r.height/H);nm.style.top=(r.top+(r.height-H*sc)/2+146*sc)+'px';nm.style.width=Math.min(W*sc*.72,300)+'px'}
 addEventListener('resize',placeNm);
 function endGame(m){if(mode!='play')return;mode=m;T[7]=now;const secs=g.t/60;
- res={win:m=='win',score:m=='win'?1000+Math.max(0,1000-Math.floor(secs*10)):Math.floor(g.d/10),code:mkcode()};
+ res={win:m=='win',score:m=='win'?DIF.goal+Math.max(0,1000-Math.floor(secs*5)):Math.min(DIF.goal-1,Math.floor(g.d/10)),code:mkcode()};
  try{inp.value=localStorage.getItem('c3name')||''}catch(e){}placeNm();nm.style.display='block'}
 async function submit(){const n=inp.value.trim().toUpperCase().replace(/[^A-Z0-9 ._-]/g,'').slice(0,12);if(!n){inp.focus();return}
  ok.disabled=true;try{localStorage.setItem('c3name',n)}catch(e){}
@@ -100,7 +100,7 @@ async function submit(){const n=inp.value.trim().toUpperCase().replace(/[^A-Z0-9
  nm.style.display='none';mode='rank';T[7]=now;board=null;
  try{if(db)await db.collection('scores').add(rec);else locSave(rec)}catch(e){locSave(rec);offline=true}
  ok.disabled=false;board=await getTop()}
-ok.onclick=submit;inp.addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if(e.key=='Enter')submit()});
+ok.onclick=submit;inp.addEventListener('keydown',e=>{if(e.key=='Enter')submit()});
 sk.onclick=()=>{nm.style.display='none';mode='flyer'};
 function rankScreen(){R(0,0,W,H,'#0b0508');for(let i=0;i<8;i++)R(30+i*30,60,14,G-60,'#150a0e');curtains();
  txt('RANKING',W/2,52,14,CY);
