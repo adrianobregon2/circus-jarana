@@ -39,7 +39,7 @@ const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=270,H=480,G=372;
 // ===== DIFICULTAD (tocá solo estos numeros) =====
 // goal: metros hasta la meta | v0: velocidad inicial | vmax: velocidad maxima
 // ramp: cuanto mas chico, mas rapido acelera | gapMin/gapMax: separacion entre obstaculos (1.0 = casi imposible, 2.5 = facil)
-const DIF={goal:600,v0:2.8,vmax:5.7,ramp:700,gapMin:1.0,gapMax:2.2};
+const DIF={goal:600,v0:2.8,vmax:5.7,ramp:700,gapMin:0.9,gapMax:2.2};
 const TOUCH=matchMedia('(pointer:coarse)').matches,PRE=TOUCH?'TOCA PARA ':PRE;
 const RED='#e8281e',CY='#27d6f0',WH='#fff',GOLD='#c9a227',FONT='"Press Start 2P",monospace';
 let step=0,mode='flyer',T=[0],now=0,last=0,blink=0;
@@ -79,7 +79,7 @@ function flyer(){
 }
 // ---- juego ----
 let g,res=null,board=null;
-const FB={apiKey:"TU_API_KEY",authDomain:"TU_PROJECT_ID.firebaseapp.com",projectId:"TU_PROJECT_ID",appId:"TU_APP_ID"};
+const FB={apiKey:"AIzaSyC1tuyt_iPIYGISOjdnvcPfkXtZFVuE_Ew",authDomain:"jarana-circus.firebaseapp.com",projectId:"jarana-circus",appId:"1:821190166687:web:d455d1d364d9d7389a7aaa"};
 let db=null,offline=false;
 try{if(!FB.projectId.startsWith('TU_')){firebase.initializeApp(FB);db=firebase.firestore()}}catch(e){}
 const nm=document.getElementById('nm'),inp=document.getElementById('inp'),ok=document.getElementById('ok'),sk=document.getElementById('sk');
