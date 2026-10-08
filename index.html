@@ -7,12 +7,21 @@
  3) Pestana "Reglas": pegar lo de abajo y Publicar.
  4) Configuracion del proyecto > Tus apps > Web (</>) > copiar firebaseConfig y pegarlo en FB (mas abajo, en el script).
  5) Subir este archivo (renombrado index.html) a Netlify Drop, Cloudflare Pages o GitHub Pages. Generar un QR con el link.
- REGLAS:
+ REGLAS (pegar en Firestore > Reglas > Publicar):
  rules_version = '2';
  service cloud.firestore { match /databases/{d}/documents { match /scores/{id} {
    allow read: if true;
-   allow create: if request.resource.data.name is string && request.resource.data.name.size() <= 12
-     && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 10000;
+   allow create: if request.resource.data.keys().hasOnly(['name','score','win','ms','code','ts'])
+     && request.resource.data.keys().hasAll(['name','score','win','ms','code','ts'])
+     && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 12
+     && request.resource.data.name.matches('^[A-Z0-9 ._-]+$')
+     && request.resource.data.code is string && request.resource.data.code.size() == 4
+     && request.resource.data.ts == request.time
+     && request.resource.data.ms is int && request.resource.data.ms >= 0 && request.resource.data.ms <= 3600000
+     && request.resource.data.score is int && request.resource.data.score >= 0 && request.resource.data.score <= 4000
+     && request.resource.data.win is bool
+     && ((request.resource.data.win == true && request.resource.data.score >= 3000 && request.resource.data.ms >= 60000)
+       || (request.resource.data.win == false && request.resource.data.score <= 2999 && request.resource.data.score <= request.resource.data.ms / 20));
    allow update, delete: if false; } } }
  Sin configurar FB, funciona en "MODO LOCAL" (ranking solo en ese celu).
 -->
@@ -34,12 +43,14 @@ canvas{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;widt
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script></head><body>
 <canvas id="c" width="270" height="480"></canvas>
 <div id="nm"><input id="inp" maxlength="12" placeholder="NOMBRE" autocomplete="off"><button id="ok">ENVIAR</button><button class="s" id="sk">SIN GUARDAR</button></div>
-<script>
+<script>(()=>{
 const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=270,H=480,G=372;
 // ===== DIFICULTAD (tocá solo estos numeros) =====
 // goal: metros hasta la meta | v0: velocidad inicial | vmax: velocidad maxima
 // ramp: cuanto mas chico, mas rapido acelera | gapMin/gapMax: separacion entre obstaculos (1.0 = casi imposible, 2.5 = facil)
-const DIF={goal:3000,v0:2.8,vmax:8.2,ramp:500,gapMin:1.1,gapMax:2.2};
+// OJO: goal y vmax estan escritos tambien en las reglas de Firebase (3000, 60000 ms, ms/20). Si los cambias, actualizalas.
+// tiempo minimo posible (ms) = goal*1000/(6*vmax) | metros maximos por ms = 6*vmax/1000
+const DIF=Object.freeze({goal:3000,v0:2.8,vmax:8.2,ramp:500,gapMin:1.1,gapMax:2.2});
 const TOUCH=matchMedia('(pointer:coarse)').matches,PRE=TOUCH?'TOCA PARA ':'PRESIONE X PARA ';
 const RED='#e8281e',CY='#27d6f0',WH='#fff',GOLD='#c9a227',FONT='"Press Start 2P",monospace';
 let step=0,mode='flyer',T=[0],now=0,last=0,blink=0;
@@ -86,19 +97,24 @@ const nm=document.getElementById('nm'),inp=document.getElementById('inp'),ok=doc
 const mkcode=()=>Array.from({length:4},()=>'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.random()*31|0]).join('');
 const locGet=()=>{try{return JSON.parse(localStorage.getItem('c3scores')||'[]')}catch(e){return[]}};
 const locSave=r=>{try{localStorage.setItem('c3scores',JSON.stringify(locGet().concat(r).slice(-200)))}catch(e){}};
-const sortB=a=>a.sort((x,y)=>y.score-x.score||x.ts-y.ts).slice(0,10);
-async function getTop(){if(db){try{const q=await db.collection('scores').orderBy('score','desc').limit(10).get();return sortB(q.docs.map(d=>d.data()))}catch(e){offline=true}}return sortB(locGet())}
+const tsv=x=>x&&x.toMillis?x.toMillis():(x||0);
+const sortB=a=>{a.sort((x,y)=>y.score-x.score||tsv(x.ts)-tsv(y.ts));const seen=new Set();return a.filter(r=>!seen.has(r.name)&&seen.add(r.name)).slice(0,10)};
+const BAD=['PUTO','PUTA','MIERDA','CONCHA','VERGA','PIJA','CULO','NAZI','HITLER','CAGON','FORRO','SEXO','PORN'];
+const bad=n=>{const x=n.replace(/0/g,'O').replace(/1/g,'I').replace(/3/g,'E').replace(/4/g,'A').replace(/5/g,'S').replace(/[^A-Z]/g,'');return BAD.some(w=>x.includes(w))};
+async function getTop(){if(db){try{const q=await db.collection('scores').orderBy('score','desc').limit(25).get();return sortB(q.docs.map(d=>d.data()))}catch(e){offline=true}}return sortB(locGet())}
 function placeNm(){const r=cv.getBoundingClientRect(),sc=Math.min(r.width/W,r.height/H);nm.style.top=(r.top+(r.height-H*sc)/2+146*sc)+'px';nm.style.width=Math.min(W*sc*.72,300)+'px'}
 addEventListener('resize',placeNm);
-function endGame(m){if(mode!='play')return;mode=m;T[7]=now;const secs=g.t/60;
- res={win:m=='win',score:m=='win'?DIF.goal+Math.max(0,1000-Math.floor(secs*5)):Math.min(DIF.goal-1,Math.floor(g.d/10)),code:mkcode()};
+function endGame(m){if(mode!='play')return;mode=m;T[7]=now;const ms=Math.round(performance.now()-g.t0);
+ res={win:m=='win',score:m=='win'?DIF.goal+Math.max(0,1000-Math.floor(ms/200)):Math.min(DIF.goal-1,Math.floor(g.d/10)),ms:ms,code:mkcode()};
  try{inp.value=localStorage.getItem('c3name')||''}catch(e){}placeNm();nm.style.display='block'}
 async function submit(){const n=inp.value.trim().toUpperCase().replace(/[^A-Z0-9 ._-]/g,'').slice(0,12);if(!n){inp.focus();return}
+ if(bad(n)){inp.value='';inp.placeholder='NOMBRE NO VALIDO';inp.focus();return}
  ok.disabled=true;try{localStorage.setItem('c3name',n)}catch(e){}
  res.name=n;res.when=new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
- const rec={name:n,score:res.score,win:res.win,ts:Date.now(),code:res.code};
+ const rec={name:n,score:res.score,win:res.win,ms:res.ms,code:res.code};
  nm.style.display='none';mode='rank';T[7]=now;board=null;
- try{if(db)await db.collection('scores').add(rec);else locSave(rec)}catch(e){locSave(rec);offline=true}
+ const loc=()=>locSave({...rec,ts:Date.now()});
+ try{if(db){let sent=false;for(let i=0;i<2&&!sent;i++){try{await db.collection('scores').add({...rec,ts:firebase.firestore.FieldValue.serverTimestamp()});sent=true}catch(e){if(!i)await new Promise(r=>setTimeout(r,1500))}}if(!sent){loc();offline=true}}else loc()}catch(e){loc();offline=true}
  ok.disabled=false;board=await getTop()}
 ok.onclick=submit;inp.addEventListener('keydown',e=>{if(e.key=='Enter')submit()});
 sk.onclick=()=>{nm.style.display='none';mode='flyer'};
@@ -108,7 +124,7 @@ function rankScreen(){R(0,0,W,H,'#0b0508');for(let i=0;i<8;i++)R(30+i*30,60,14,G
  if(res&&res.name){txt('TU CODIGO '+res.code,W/2,336,8,CY);txt(res.name+' - '+res.score+' - '+res.when,W/2,352,6,WH);txt('MOSTRA ESTA PANTALLA EN LA BARRA',W/2,370,6,WH)}
  if(!db||offline)txt('MODO LOCAL',W/2,392,6,RED);
  multi([[PRE,WH],['JUGAR',CY]],420,8)}
-function start(){g={y:0,vy:0,d:0,sp:DIF.v0,obs:[],next:250,t:0};mode='play'}
+function start(){g={y:0,vy:0,d:0,sp:DIF.v0,obs:[],next:250,t:0,t0:performance.now()};mode='play'}
 function jump(){if(g.y==0)g.vy=9}
 function game(dt){
  R(0,0,W,H,'#0b0508');
@@ -150,4 +166,5 @@ function press(){
 addEventListener('keydown',e=>{if(['x','X',' ','ArrowUp','Enter'].includes(e.key)){e.preventDefault();if(!e.repeat)press()}});
 cv.addEventListener('pointerdown',e=>{e.preventDefault();press()});
 (document.fonts?document.fonts.load('16px "Press Start 2P"').catch(()=>{}):Promise.resolve()).then(()=>requestAnimationFrame(loop));
+})();
 </script></body></html>
