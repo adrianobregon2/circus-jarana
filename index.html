@@ -101,7 +101,7 @@ const tsv=x=>x&&x.toMillis?x.toMillis():(x||0);
 const sortB=a=>{a.sort((x,y)=>y.score-x.score||tsv(x.ts)-tsv(y.ts));const seen=new Set();return a.filter(r=>!seen.has(r.name)&&seen.add(r.name)).slice(0,10)};
 const BAD=['PUTO','PUTA','MIERDA','CONCHA','VERGA','PIJA','CULO','NAZI','HITLER','CAGON','FORRO','SEXO','PORN'];
 const bad=n=>{const x=n.replace(/0/g,'O').replace(/1/g,'I').replace(/3/g,'E').replace(/4/g,'A').replace(/5/g,'S').replace(/[^A-Z]/g,'');return BAD.some(w=>x.includes(w))};
-async function getTop(){if(db){try{const q=await db.collection('scores').orderBy('score','desc').limit(25).get();return sortB(q.docs.map(d=>d.data()))}catch(e){offline=true}}return sortB(locGet())}
+async function getTop(){if(db){try{const q=await db.collection('scores').orderBy('score','desc').limit(10).get();return sortB(q.docs.map(d=>d.data()))}catch(e){offline=true}}return sortB(locGet())}
 function placeNm(){const r=cv.getBoundingClientRect(),sc=Math.min(r.width/W,r.height/H);nm.style.top=(r.top+(r.height-H*sc)/2+146*sc)+'px';nm.style.width=Math.min(W*sc*.72,300)+'px'}
 addEventListener('resize',placeNm);
 function endGame(m){if(mode!='play')return;mode=m;T[7]=now;const ms=Math.round(performance.now()-g.t0);
