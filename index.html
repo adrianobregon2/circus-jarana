@@ -121,7 +121,7 @@ sk.onclick=()=>{nm.style.display='none';mode='flyer'};
 function rankScreen(){R(0,0,W,H,'#0b0508');for(let i=0;i<8;i++)R(30+i*30,60,14,G-60,'#150a0e');curtains();
  txt('RANKING',W/2,52,14,CY);
  if(!board)txt('CARGANDO...',W/2,200,8,WH);else board.forEach((r,i)=>{const y=80+i*24,c=res&&r.code==res.code?CY:WH;txt(''+(i+1),34,y,8,c,'left');txt(r.name,56,y,8,c,'left');txt(''+r.score,W-34,y,8,c,'right')});
- if(res&&res.name){txt('TU CODIGO '+res.code,W/2,336,8,CY);txt(res.name+' - '+res.score+' - '+res.when,W/2,352,6,WH);txt('MOSTRA ESTA PANTALLA EN LA BARRA',W/2,370,6,WH)}
+ if(res&&res.name){txt('TU CODIGO '+res.code,W/2,336,8,CY);txt(res.name+' - '+res.score+' - '+res.when,W/2,352,6,WH);txt('MOSTRA ESTA PANTALLA EN BOLETERÍA',W/2,370,6,WH)}
  if(!db||offline)txt('MODO LOCAL',W/2,392,6,RED);
  multi([[PRE,WH],['JUGAR',CY]],420,8)}
 function start(){g={y:0,vy:0,d:0,sp:DIF.v0,obs:[],next:250,t:0,t0:performance.now()};mode='play'}
