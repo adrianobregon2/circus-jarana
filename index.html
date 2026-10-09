@@ -89,7 +89,7 @@ function flyer(){
  if(mode=='over'||mode=='win'){}
 }
 // ---- juego ----
-let g,res=null,board=null;
+let g,res=null,board=null,rk=0,saveFail=false,cache={t:0,rows:null};
 const FB={apiKey:"AIzaSyC1tuyt_iPIYGISOjdnvcPfkXtZFVuE_Ew",authDomain:"jarana-circus.firebaseapp.com",projectId:"jarana-circus",appId:"1:821190166687:web:d455d1d364d9d7389a7aaa"};
 let db=null,offline=false;
 try{if(!FB.projectId.startsWith('TU_')){firebase.initializeApp(FB);db=firebase.firestore()}}catch(e){}
@@ -101,7 +101,10 @@ const tsv=x=>x&&x.toMillis?x.toMillis():(x||0);
 const sortB=a=>{a.sort((x,y)=>y.score-x.score||tsv(x.ts)-tsv(y.ts));const seen=new Set();return a.filter(r=>!seen.has(r.name)&&seen.add(r.name)).slice(0,10)};
 const BAD=['PUTO','PUTA','MIERDA','CONCHA','VERGA','PIJA','CULO','NAZI','HITLER','CAGON','FORRO','SEXO','PORN'];
 const bad=n=>{const x=n.replace(/0/g,'O').replace(/1/g,'I').replace(/3/g,'E').replace(/4/g,'A').replace(/5/g,'S').replace(/[^A-Z]/g,'');return BAD.some(w=>x.includes(w))};
-async function getTop(){if(db){try{const q=await db.collection('scores').orderBy('score','desc').limit(5).get();return sortB(q.docs.map(d=>d.data()))}catch(e){offline=true}}return sortB(locGet())}
+async function getTop(){if(db){try{const q=await db.collection('scores').orderBy('score','desc').limit(10).get();return sortB(q.docs.map(d=>d.data()))}catch(e){offline=true}}return sortB(locGet())}
+async function showRank(){if(rk)return;rk=1;let rows;
+ if(cache.rows&&Date.now()-cache.t<120000)rows=cache.rows;else{board=null;rows=await getTop();cache={t:Date.now(),rows}}
+ if(res&&res.name&&!rows.some(r=>r.code==res.code))rows=sortB(rows.concat({name:res.name,score:res.score,code:res.code,ts:Date.now()}));board=rows}
 function placeNm(){const r=cv.getBoundingClientRect(),sc=Math.min(r.width/W,r.height/H);nm.style.top=(r.top+(r.height-H*sc)/2+146*sc)+'px';nm.style.width=Math.min(W*sc*.72,300)+'px'}
 addEventListener('resize',placeNm);
 function endGame(m){if(mode!='play')return;mode=m;T[7]=now;const ms=Math.round(performance.now()-g.t0);
@@ -112,16 +115,21 @@ async function submit(){const n=inp.value.trim().toUpperCase().replace(/[^A-Z0-9
  ok.disabled=true;try{localStorage.setItem('c3name',n)}catch(e){}
  res.name=n;res.when=new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
  const rec={name:n,score:res.score,win:res.win,ms:res.ms,code:res.code};
- nm.style.display='none';mode='rank';T[7]=now;board=null;
+ nm.style.display='none';mode='rank';T[7]=now;board=null;rk=0;saveFail=false;
  const loc=()=>locSave({...rec,ts:Date.now()});
- try{if(db){let sent=false;for(let i=0;i<2&&!sent;i++){try{await db.collection('scores').add({...rec,ts:firebase.firestore.FieldValue.serverTimestamp()});sent=true}catch(e){if(!i)await new Promise(r=>setTimeout(r,1500))}}if(!sent){loc();offline=true}}else loc()}catch(e){loc();offline=true}
- ok.disabled=false;board=await getTop()}
+ try{if(db){let sent=false;for(let i=0;i<2&&!sent;i++){try{await db.collection('scores').add({...rec,ts:firebase.firestore.FieldValue.serverTimestamp()});sent=true}catch(e){if(!i)await new Promise(r=>setTimeout(r,1500))}}if(!sent){loc();offline=true;saveFail=true}}else loc()}catch(e){loc();offline=true;saveFail=true}
+ ok.disabled=false}
 ok.onclick=submit;inp.addEventListener('keydown',e=>{if(e.key=='Enter')submit()});
 sk.onclick=()=>{nm.style.display='none';mode='flyer'};
+function btn(y,t,c){ctx.save();ctx.globalAlpha=.9;R(50,y,W-100,34,'#000');ctx.restore();R(50,y,W-100,2,c);R(50,y+32,W-100,2,c);txt(t,W/2,y+13,9,c)}
 function rankScreen(){R(0,0,W,H,'#0b0508');for(let i=0;i<8;i++)R(30+i*30,60,14,G-60,'#150a0e');curtains();
+ if(!rk){txt('TU RESULTADO',W/2,56,12,CY);txt(res.name,W/2,100,16,WH);txt('PUNTAJE '+res.score,W/2,136,12,res.win?CY:WH);if(res.win)txt('GANASTE!',W/2,160,12,CY);
+  txt('CODIGO '+res.code,W/2,196,12,CY);txt(res.when,W/2,222,8,WH);if(res.win){txt('MUESTRA ESTE CODIGO',W/2,244,7,CY);txt('EN BOLETERIA',W/2,258,7,CY)}
+  if(saveFail)txt('NO SE PUDO ENVIAR',W/2,274,6,RED);
+  btn(288,'VER RANKING',CY);btn(332,'JUGAR',RED);return}
  txt('RANKING',W/2,52,14,CY);
  if(!board)txt('CARGANDO...',W/2,200,8,WH);else board.forEach((r,i)=>{const y=80+i*24,c=res&&r.code==res.code?CY:WH;txt(''+(i+1),34,y,8,c,'left');txt(r.name,56,y,8,c,'left');txt(''+r.score,W-34,y,8,c,'right')});
- if(res&&res.name){txt('TU CODIGO '+res.code,W/2,336,8,CY);txt(res.name+' - '+res.score+' - '+res.when,W/2,352,6,WH);txt('MOSTRA ESTA PANTALLA EN BOLETERÍA',W/2,370,6,WH)}
+ if(res&&res.name){txt('TU CODIGO '+res.code,W/2,336,8,CY);txt(res.name+' - '+res.score+' - '+res.when,W/2,352,6,WH);if(res.win)txt('MUESTRA ESTE CODIGO EN BOLETERIA',W/2,370,6,CY)}
  if(!db||offline)txt('MODO LOCAL',W/2,392,6,RED);
  multi([[PRE,WH],['JUGAR',CY]],420,8)}
 function start(){g={y:0,vy:0,d:0,sp:DIF.v0,obs:[],next:250,t:0,t0:performance.now()};mode='play'}
@@ -158,13 +166,13 @@ function endScreen(win){
 function loop(t){const dt=Math.min(2,(t-(last||t))/16.67);last=t;now=t;blink++;
  if(mode=='flyer')flyer();else if(mode=='play')game(dt);else if(mode=='rank')rankScreen();else{game(0);endScreen(mode=='win')}
  requestAnimationFrame(loop)}
-function press(){
+function press(px,py){
  if(mode=='flyer'){if(step<6){step++;T[step]=now}else start()}
  else if(mode=='play')jump();
- else if(mode=='rank'&&now-T[7]>400)mode='flyer';
+ else if(mode=='rank'&&now-T[7]>400){if(!rk){if(py==null)mode='flyer';else if(py>=286&&py<=324)showRank();else if(py>=330&&py<=368)mode='flyer'}else mode='flyer'}
 }
-addEventListener('keydown',e=>{if(['x','X',' ','ArrowUp','Enter'].includes(e.key)){e.preventDefault();if(!e.repeat)press()}});
-cv.addEventListener('pointerdown',e=>{e.preventDefault();press()});
+addEventListener('keydown',e=>{if(e.target.tagName=='INPUT')return;if((e.key=='r'||e.key=='R')&&mode=='rank'&&!rk){showRank();return}if(['x','X',' ','ArrowUp','Enter'].includes(e.key)){e.preventDefault();if(!e.repeat)press()}});
+cv.addEventListener('pointerdown',e=>{e.preventDefault();const r=cv.getBoundingClientRect(),sc=Math.min(r.width/W,r.height/H);press((e.clientX-(r.left+(r.width-W*sc)/2))/sc,(e.clientY-(r.top+(r.height-H*sc)/2))/sc)});
 (document.fonts?document.fonts.load('16px "Press Start 2P"').catch(()=>{}):Promise.resolve()).then(()=>requestAnimationFrame(loop));
 })();
 </script></body></html>
